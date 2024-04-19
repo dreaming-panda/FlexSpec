@@ -147,7 +147,7 @@ class KVCacheBuffer:
         self.max_length = max_length
         self.device = device
         self.dtype = dtype
-        self.world_size = config.world_size
+        self.world_size = dist.get_world_size()
         self.batch_size = batch_size
         self.local_rank = config.local_rank
 
@@ -237,7 +237,7 @@ class KV_Cache:
         self.max_length = max_length
         self.device = device
         self.dtype = dtype
-        self.world_size = config.world_size
+        self.world_size = dist.get_world_size()
         self.local_rank = config.local_rank
         self.k_cache = torch.zeros(
             config.num_hidden_layers,
@@ -414,7 +414,7 @@ class LLMLayer:
         # self.rank = dist.get_rank()
         # self.world_size = dist.get_world_size()
         self.rank = config.local_rank
-        self.world_size = config.world_size
+        self.world_size = dist.get_world_size()
 
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
@@ -533,8 +533,8 @@ class LLM:
         ) -> None:
 
 
-        self.rank = local_rank
-        self.world_size = world_size
+        self.rank = dist.get_rank() ##local_rank
+        self.world_size = dist.get_world_size() ##world_size
         self.batch_size = batch_size
         # self.device = device
         self.device  = torch.device("cuda", local_rank)
