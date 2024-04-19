@@ -1,0 +1,20 @@
+Namespace(model='meta-llama/Llama-2-13b-hf', T=2000, B=1, P=128, M=512, D=1)
+Namespace(model='meta-llama/Llama-2-13b-hf', T=2000, B=1, P=128, M=512, D=1)
+Namespace(model='meta-llama/Llama-2-13b-hf', T=2000, B=1, P=128, M=512, D=1)
+Namespace(model='meta-llama/Llama-2-13b-hf', T=2000, B=1, P=128, M=512, D=1)
+local rank:  1 world size:  4
+local rank:  0 world size:  4
+local rank:  2 world size:  4
+local rank:  3 world size:  4
+num_layers:  40
+num_layers:  40
+num_layers:  40
+num_layers:  40
+cuda:2 cuda:2
+cuda:2 cuda:0 cuda:0 cuda:0
+cuda:3 cuda:3
+cuda:3 cuda:0 cuda:0 cuda:0
+cuda:0 cuda:0
+cuda:0 cuda:0 cuda:0 cuda:0
+cuda:1 cuda:1
+cuda:1 cuda:0 cuda:0 cuda:0

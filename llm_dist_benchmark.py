@@ -1,4 +1,4 @@
-from llm_dist import LLMEngine
+from llm_dist_1 import LLMEngine
 import argparse
 import time
 import torch
@@ -26,6 +26,8 @@ parser.add_argument('--D', type=int, default=1, help='dec length')
 args = parser.parse_args()
 print(args)
 dist.init_process_group(backend="nccl")
+process_group = dist.group.WORLD
+# print("Process group:", process_group)
 local_rank = dist.get_rank()
 world_size = dist.get_world_size()
 torch.cuda.set_device(local_rank)
@@ -38,14 +40,16 @@ DEVICE = torch.device("cuda", local_rank)
 T = args.T
 WARM_UP = 10
 
+print("local rank: ", local_rank,"world size: ", world_size)
+
 llm = LLMEngine(max_length=MAX_LEN, model_name=args.model, device=DEVICE)
 input_ids = torch.randint(low=3, high=30000, size=(1, PREFIX_LEN), device=DEVICE)
 attention_mask = _make_causal_mask((MAX_LEN, MAX_LEN), dtype=DTYPE, device=DEVICE)
 attention_mask = attention_mask[None, None, :, :]
 position_ids = torch.arange(PREFIX_LEN, device=DEVICE).unsqueeze(0)
 prefix_storage_ids = torch.arange(PREFIX_LEN, device=DEVICE)
-llm.initialize_cuda_graph([DEC_LEN, PREFIX_LEN])
-llm.inference(input_ids=input_ids, position_ids=position_ids, attention_mask=attention_mask[..., :PREFIX_LEN,:], storage_ids=prefix_storage_ids)
+# llm.initialize_cuda_graph([DEC_LEN, PREFIX_LEN])
+llm.inference(input_ids=input_ids, position_ids=position_ids, attention_mask=attention_mask[..., :PREFIX_LEN,:PREFIX_LEN], storage_ids=prefix_storage_ids)
 
 input_ids = torch.randint(low=3, high=30000, size=(1, DEC_LEN), device=DEVICE)
 storage_ids = torch.arange(DEC_LEN, device=DEVICE) + PREFIX_LEN
