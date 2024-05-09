@@ -426,6 +426,9 @@ class LLM:
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, self.cos_cache, self.sin_cache, position_ids)
         key_states, value_states = self.kv_cache.update_kv_cache(key_states, value_states, layer_idx, storage_ids)
         
+        key_states = repeat_kv(key_states, self.num_key_value_groups)
+        value_states = repeat_kv(value_states, self.num_key_value_groups)
+        
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
         
         attn_weights = attn_weights + attention_mask

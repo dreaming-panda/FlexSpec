@@ -15,7 +15,7 @@ def _make_causal_mask(
     mask = mask.to(dtype)
     return mask
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default="meta-llama/Llama-2-13b-hf",help='model')
+parser.add_argument('--model', type=str, default="meta-llama/Meta-Llama-3-8B-Instruct",help='model')
 parser.add_argument('--T', type=int, default=2000, help='repeat times')
 parser.add_argument('--B', type=int, default=1, help='batch size')
 parser.add_argument('--P', type=int, default=128, help='prefix length')
