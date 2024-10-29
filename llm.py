@@ -1,14 +1,10 @@
 from transformers import LlamaForCausalLM, LlamaConfig
 import torch
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
-from time import sleep
-import math
 import torch.nn.functional as F
-from torch import nn
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional
 import gc
-from flash_attn import flash_attn_with_kvcache
-import torch.distributed as dist
+import flashinfer
 def _make_causal_mask(
     input_ids_shape: torch.Size, dtype: torch.dtype, device: torch.device
 ):
@@ -220,12 +216,12 @@ def layer_norm(
     hidden_states: torch.Tensor,
     layernorm_variance_epsilon: float,
     layernorm_weight: torch.Tensor,
-):
-    input_dtype = hidden_states.dtype
-    hidden_states = hidden_states.to(torch.float32)
-    variance = hidden_states.pow(2).mean(-1, keepdim=True)
-    hidden_states = hidden_states * torch.rsqrt(variance + layernorm_variance_epsilon)
-    hidden_states = layernorm_weight * hidden_states.to(input_dtype)
+):  
+    b, s, h = hidden_states.shape
+    
+    hidden_states = hidden_states.reshape(b * s, h)
+    hidden_states = flashinfer.rmsnorm(hidden_states, layernorm_weight, layernorm_variance_epsilon)
+    hidden_states = hidden_states.reshape(b, s, h)
     return hidden_states
 
 class LLMLayer:
@@ -426,19 +422,20 @@ class LLM:
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, self.cos_cache, self.sin_cache, position_ids)
         key_states, value_states = self.kv_cache.update_kv_cache(key_states, value_states, layer_idx, storage_ids)
         
-        query_states = query_states.reshape(self.batch_size, self.num_key_value_heads, q_len * self.num_key_value_groups, self.head_dim)
+        query_states = query_states.squeeze(0)
+        query_states = query_states.transpose(0,1).contiguous()
+        key_states = key_states.squeeze(0).contiguous()
+        value_states = value_states.squeeze(0).contiguous()
+
+        hidden_states = flashinfer.single_prefill_with_kv_cache(
+                q = query_states,
+                k = key_states,
+                v = value_states,
+                kv_layout="HND",
+                custom_mask=attention_mask,
+                allow_fp16_qk_reduction=True
+            )
         
-        attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
-        
-        attention_mask = attention_mask.repeat(1, 1, self.num_key_value_groups, 1)
-        
-        attn_weights = attn_weights + attention_mask
-        
-        attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-        hidden_states = torch.matmul(attn_weights, value_states)
-        
-        hidden_states = hidden_states.reshape(bsz, self.num_heads, q_len, -1)
-        hidden_states = hidden_states.transpose(1, 2).contiguous()
         hidden_states = hidden_states.reshape(bsz, q_len, self.hidden_size)
         
         hidden_states = self.post_attention_compute(
