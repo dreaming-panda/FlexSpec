@@ -194,8 +194,9 @@ class KV_Cache:
         
         self.k_cache[layer_idx].index_copy_(dim=-2, index=storage_ids, source=new_k_cache)
         self.v_cache[layer_idx].index_copy_(dim=-2, index=storage_ids, source=new_v_cache)
-        
-        return self.k_cache[layer_idx], self.v_cache[layer_idx]
+        if layer_idx == 0:
+            self.kv_offset += storage_ids.shape[0]
+        return self.k_cache[layer_idx][...,:self.kv_offset,:], self.v_cache[layer_idx][...,:self.kv_offset,:]
         
 
     def clear(self):
@@ -426,13 +427,13 @@ class LLM:
         query_states = query_states.transpose(0,1).contiguous()
         key_states = key_states.squeeze(0).contiguous()
         value_states = value_states.squeeze(0).contiguous()
-
+        
         hidden_states = flashinfer.single_prefill_with_kv_cache(
                 q = query_states,
                 k = key_states,
                 v = value_states,
                 kv_layout="HND",
-                custom_mask=attention_mask,
+                custom_mask=attention_mask[...,:key_states.shape[1]],
                 allow_fp16_qk_reduction=True
             )
         

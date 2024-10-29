@@ -1,0 +1,14 @@
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 1
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 2
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 4
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 16
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 17
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 32
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 33
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 64
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 65
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 96
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 128
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 144
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 192
+CUDA_VISIBLE_DEVICES=8 python llm_benchmark.py --D 256

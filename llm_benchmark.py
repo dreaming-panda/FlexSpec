@@ -38,7 +38,7 @@ attention_mask = _make_causal_mask((MAX_LEN, MAX_LEN), dtype=DTYPE, device=DEVIC
 attention_mask = attention_mask[None, None, :, :]
 position_ids = torch.arange(PREFIX_LEN, device=DEVICE).unsqueeze(0)
 prefix_storage_ids = torch.arange(PREFIX_LEN, device=DEVICE)
-llm.initialize_cuda_graph([DEC_LEN, PREFIX_LEN])
+#llm.initialize_cuda_graph([DEC_LEN, PREFIX_LEN])
 llm.inference(input_ids=input_ids, position_ids=position_ids, attention_mask=attention_mask[..., :PREFIX_LEN,:], storage_ids=prefix_storage_ids)
 
 input_ids = torch.randint(low=3, high=30000, size=(1, DEC_LEN), device=DEVICE)

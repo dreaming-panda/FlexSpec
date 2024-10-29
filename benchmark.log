@@ -1,0 +1,3 @@
+Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=1)
+Max Length :512, Decode Length :1, Prefix Length :128, inference time:0.021115418672561646s
+Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=2)
