@@ -131,9 +131,8 @@ class KV_Cache:
         self.dtype = dtype
         self.k_cache = torch.zeros(
             config.num_hidden_layers,
-            batch_size,
-            config.num_key_value_heads,
             max_length,
+            config.num_key_value_heads,
             config.hidden_size // config.num_attention_heads,
             device=self.device,
             dtype=self.dtype
@@ -141,9 +140,8 @@ class KV_Cache:
 
         self.v_cache = torch.zeros(
             config.num_hidden_layers,
-            batch_size,
-            config.num_key_value_heads,
             max_length,
+            config.num_key_value_heads,
             config.hidden_size // config.num_attention_heads,
             device=self.device,
             dtype=self.dtype
@@ -156,8 +154,8 @@ class KV_Cache:
             v_cache :torch.Tensor,
             kv_len :int):
         
-        self.k_cache[...,:kv_len,:] = k_cache[...,:kv_len,:]
-        self.v_cache[...,:kv_len,:] = v_cache[...,:kv_len,:]
+        self.k_cache[...,:kv_len,:,:] = k_cache[...,:kv_len,:,:]
+        self.v_cache[...,:kv_len,:,:] = v_cache[...,:kv_len,:,:]
 
         self.kv_offset = kv_len
         
@@ -165,21 +163,21 @@ class KV_Cache:
     
     def gather_kv(self, indices: list[int]):
 
-        self.k_cache[..., :len(indices), :] = self.k_cache[..., indices, :]
-        self.v_cache[..., :len(indices), :] = self.v_cache[..., indices, :]
+        self.k_cache[..., :len(indices), :,:] = self.k_cache[..., indices, :,:]
+        self.v_cache[..., :len(indices), :,:] = self.v_cache[..., indices, :,:]
 
-        self.k_cache[..., len(indices):, :] = 0.0
-        self.v_cache[..., len(indices):, :] = 0.0
+        self.k_cache[..., len(indices):, :,:] = 0.0
+        self.v_cache[..., len(indices):, :,:] = 0.0
 
         self.kv_offset = len(indices)
     
     def gather_kv_incremental(self, indices: list[int], offset:int):
 
-        self.k_cache[..., offset:offset + len(indices), :] = self.k_cache[..., indices, :]
-        self.v_cache[..., offset:offset + len(indices), :] = self.v_cache[..., indices, :]
+        self.k_cache[..., offset:offset + len(indices), :,:] = self.k_cache[..., indices, :,:]
+        self.v_cache[..., offset:offset + len(indices), :,:] = self.v_cache[..., indices, :,:]
 
-        self.k_cache[..., offset + len(indices):, :] = 0.0
-        self.v_cache[..., offset + len(indices):, :] = 0.0
+        self.k_cache[..., offset + len(indices):, :,:] = 0.0
+        self.v_cache[..., offset + len(indices):, :,:] = 0.0
 
         self.kv_offset = offset + len(indices)
 
@@ -192,12 +190,12 @@ class KV_Cache:
             storage_ids: torch.LongTensor
             ):
         
-        self.k_cache[layer_idx].index_copy_(dim=-2, index=storage_ids, source=new_k_cache)
-        self.v_cache[layer_idx].index_copy_(dim=-2, index=storage_ids, source=new_v_cache)
-        if layer_idx == 0:
-            self.kv_offset += storage_ids.shape[0]
-        return self.k_cache[layer_idx][...,:self.kv_offset,:], self.v_cache[layer_idx][...,:self.kv_offset,:]
-        
+        self.k_cache[layer_idx].index_copy_(dim=0, index=storage_ids, source=new_k_cache)
+        self.v_cache[layer_idx].index_copy_(dim=0, index=storage_ids, source=new_v_cache)
+        # if layer_idx == 0:
+        #     self.kv_offset += storage_ids.shape[0]
+        # return self.k_cache[layer_idx][:self.kv_offset,:,:], self.v_cache[layer_idx][:self.kv_offset,:,:]
+        return self.k_cache[layer_idx], self.v_cache[layer_idx]
 
     def clear(self):
         self.k_cache.zero_()
@@ -368,9 +366,9 @@ class LLM:
         query_states = F.linear(hidden_states, wq)
         key_states = F.linear(hidden_states, wk)
         value_states = F.linear(hidden_states, wv)
-        query_states = query_states.view(bsz, q_len, num_heads, head_dim).transpose(1, 2)
-        key_states = key_states.view(bsz, q_len, num_key_value_heads, head_dim).transpose(1, 2)
-        value_states = value_states.view(bsz, q_len, num_key_value_heads, head_dim).transpose(1, 2)
+        query_states = query_states.view(q_len, num_heads, head_dim)
+        key_states = key_states.view(q_len, num_key_value_heads, head_dim)
+        value_states = value_states.view(q_len, num_key_value_heads, head_dim)
         return query_states, key_states, value_states
     def post_attention_compute(
         self,
@@ -419,21 +417,14 @@ class LLM:
             self.num_key_value_heads,
             self.head_dim
         )
-        
-        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, self.cos_cache, self.sin_cache, position_ids)
-        key_states, value_states = self.kv_cache.update_kv_cache(key_states, value_states, layer_idx, storage_ids)
-        
-        query_states = query_states.squeeze(0)
-        query_states = query_states.transpose(0,1).contiguous()
-        key_states = key_states.squeeze(0).contiguous()
-        value_states = value_states.squeeze(0).contiguous()
-        
+        flashinfer.apply_rope_pos_ids_inplace(query_states, key_states, position_ids, interleave=False, rope_theta=1e4)
+        key_states, value_states = self.kv_cache.update_kv_cache(key_states, value_states, layer_idx, storage_ids)        
         hidden_states = flashinfer.single_prefill_with_kv_cache(
                 q = query_states,
                 k = key_states,
                 v = value_states,
-                kv_layout="HND",
-                custom_mask=attention_mask[...,:key_states.shape[1]],
+                kv_layout="NHD",
+                custom_mask=attention_mask,
                 allow_fp16_qk_reduction=True
             )
         

@@ -2,6 +2,9 @@ from llm import LLMEngine
 import argparse
 import time
 import torch
+import os
+os.environ['TORCH_CUDA_ARCH_LIST'] =  "8.9"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 def _make_causal_mask(
     input_ids_shape: torch.Size, dtype: torch.dtype, device: torch.device
 ):
@@ -9,10 +12,9 @@ def _make_causal_mask(
     Make causal mask used for bi-directional self-attention.
     """
     bsz, tgt_len = input_ids_shape
-    mask = torch.full((tgt_len, tgt_len), torch.tensor(torch.finfo(dtype).min, device=device), device=device)
+    mask = torch.full((tgt_len, tgt_len), torch.tensor(False, device=device), device=device)
     mask_cond = torch.arange(mask.size(-1), device=device)
-    mask.masked_fill_(mask_cond < (mask_cond + 1).view(mask.size(-1), 1), 0)
-    mask = mask.to(dtype)
+    mask.masked_fill_(mask_cond < (mask_cond + 1).view(mask.size(-1), 1), True)
     return mask
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, default="meta-llama/Llama-2-7b-chat-hf",help='model')
@@ -35,16 +37,16 @@ WARM_UP = 10
 llm = LLMEngine(max_length=MAX_LEN, model_name=args.model)
 input_ids = torch.randint(low=3, high=30000, size=(1, PREFIX_LEN), device=DEVICE)
 attention_mask = _make_causal_mask((MAX_LEN, MAX_LEN), dtype=DTYPE, device=DEVICE)
-attention_mask = attention_mask[None, None, :, :]
+#attention_mask = attention_mask[None, None, :, :]
 position_ids = torch.arange(PREFIX_LEN, device=DEVICE).unsqueeze(0)
 prefix_storage_ids = torch.arange(PREFIX_LEN, device=DEVICE)
-#llm.initialize_cuda_graph([DEC_LEN, PREFIX_LEN])
-llm.inference(input_ids=input_ids, position_ids=position_ids, attention_mask=attention_mask[..., :PREFIX_LEN,:], storage_ids=prefix_storage_ids)
+llm.initialize_cuda_graph([DEC_LEN, PREFIX_LEN])
+llm.inference(input_ids=input_ids, position_ids=position_ids, attention_mask=attention_mask[:PREFIX_LEN,:], storage_ids=prefix_storage_ids)
 
 input_ids = torch.randint(low=3, high=30000, size=(1, DEC_LEN), device=DEVICE)
 storage_ids = torch.arange(DEC_LEN, device=DEVICE) + PREFIX_LEN
 position_ids = storage_ids.clone().unsqueeze(0)
-attention_mask = attention_mask[..., PREFIX_LEN: PREFIX_LEN + DEC_LEN,:].clone()
+attention_mask = attention_mask[PREFIX_LEN: PREFIX_LEN + DEC_LEN,:].clone()
 for _ in range(WARM_UP):
     llm.inference(input_ids=input_ids, position_ids=position_ids, attention_mask=attention_mask, storage_ids=storage_ids)
 torch.cuda.synchronize()

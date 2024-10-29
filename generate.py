@@ -46,9 +46,12 @@ prefix_storage_ids = torch.arange(MAX_LEN, device=DEVICE)
 llm.initialize_cuda_graph([DEC_LEN, PREFIX_LEN])
 
 logits = llm.inference(input_ids=input_ids, position_ids=position_ids[:,:PREFIX_LEN], attention_mask=attention_mask[:PREFIX_LEN,:], storage_ids=prefix_storage_ids[:PREFIX_LEN])
-print(logits)
 token = input_ids[0].tolist()
 for i in range(GEN_LEN):
-    input_ids = torch.argmax(logits[:,-1,:], keepdim=True)
+    proba = torch.softmax(logits[:,-1,:]/0.6, dim=-1)
+    input_ids = torch.multinomial(proba, num_samples=1)
     logits = llm.inference(input_ids=input_ids, position_ids=position_ids[:,PREFIX_LEN+i:PREFIX_LEN+i+1], attention_mask=attention_mask[PREFIX_LEN+i:PREFIX_LEN+i+1,:], storage_ids=prefix_storage_ids[PREFIX_LEN+i:PREFIX_LEN+i+1])
-    print(logits)
+    token.append(input_ids.item())
+text = tokenizer.decode(token, skip_special_tokens=True)
+
+print(text)
