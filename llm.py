@@ -188,10 +188,15 @@ class KV_Cache:
             layer_idx :int,
             storage_ids: torch.LongTensor
             ):
-        
-        self.k_cache[layer_idx].index_copy_(dim=0, index=storage_ids, source=new_k_cache)
-        self.v_cache[layer_idx].index_copy_(dim=0, index=storage_ids, source=new_v_cache)
-        return self.k_cache[layer_idx], self.v_cache[layer_idx]
+
+        new_kv_len = storage_ids.shape[0]
+        if layer_idx == 0:
+            self.kv_offset += new_kv_len
+        self.k_cache[layer_idx][self.kv_offset - new_kv_len:self.kv_offset] = new_k_cache
+        self.v_cache[layer_idx][self.kv_offset - new_kv_len:self.kv_offset] = new_v_cache
+       # self.k_cache[layer_idx].index_copy_(dim=0, index=storage_ids, source=new_k_cache)
+       # self.v_cache[layer_idx].index_copy_(dim=0, index=storage_ids, source=new_v_cache)
+        return self.k_cache[layer_idx][:self.kv_offset], self.v_cache[layer_idx][:self.kv_offset]
 
     def clear(self):
         self.k_cache.zero_()
@@ -420,7 +425,7 @@ class LLM:
                 k = key_states,
                 v = value_states,
                 kv_layout="NHD",
-                custom_mask=attention_mask,
+                custom_mask=attention_mask[:,:key_states.shape[0]],
                 allow_fp16_qk_reduction=True
             )
         
@@ -450,11 +455,11 @@ class LLM:
         for idx in range(self.num_layers):
                 hidden_states = self.layer_compute(self.layers[idx], idx, hidden_states, position_ids, attention_mask, storage_ids)
         
-        input_dtype = hidden_states.dtype
-        hidden_states = hidden_states.to(torch.float32)
-        variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        hidden_states = hidden_states * torch.rsqrt(variance + self.norm_variance_epsilon)
-        hidden_states = self.norm_weight * hidden_states.to(input_dtype)
+        b, s, h = hidden_states.shape
+
+        hidden_states = hidden_states.reshape(b * s, h)
+        hidden_states = flashinfer.rmsnorm(hidden_states, self.norm_weight, self.norm_variance_epsilon)
+        hidden_states = hidden_states.reshape(b, s, h)
         logits = F.linear(hidden_states, self.lm_head).float()
         return logits
 

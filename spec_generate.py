@@ -1,6 +1,6 @@
 from speculation_engine import SpeculationEngine
 import os
-os.environ['TORCH_CUDA_ARCH_LIST'] =  "8.9"
+os.environ['TORCH_CUDA_ARCH_LIST'] =  "8.0"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import argparse
 parser = argparse.ArgumentParser()

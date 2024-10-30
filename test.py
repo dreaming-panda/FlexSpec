@@ -5,7 +5,7 @@ import urllib.request
 import os
 from speculation_engine import SpeculationEngine
 import torch
-os.environ['TORCH_CUDA_ARCH_LIST'] =  "8.9"
+os.environ['TORCH_CUDA_ARCH_LIST'] =  "8.0"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import argparse
 parser = argparse.ArgumentParser()
@@ -15,9 +15,9 @@ parser.add_argument('--G', type=int, default=128, help='generation length')
 parser.add_argument('--growmap', type=str, default="trees/L40-CNN-68m-7b-greedy.pt", help='growmap path')
 args = parser.parse_args()
 print(args)
-torch.cuda.set_device(1)
+torch.cuda.set_device(0)
 MODEL_NAME = args.model
-DEVICE = "cuda:1"
+DEVICE = "cuda:0"
 GEN_LEN = args.G
 path = args.growmap
 draft_model_name = args.draft_model

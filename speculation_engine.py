@@ -75,10 +75,10 @@ class SpeculationEngine:
                     max_length=self.max_length, device=self.device,
                     dtype=self.dtype)
         
-        self.draft_model.initialize_cuda_graph(graph_capture_list)
-        print("[DRAFT MODEL]: Initialize CUDA GRAPH")
-        self.target_model.initialize_cuda_graph([self.tree_size])
-        print("[TARGET MODEL]: Initialize CUDA GRAPH")
+        #self.draft_model.initialize_cuda_graph(graph_capture_list)
+        #print("[DRAFT MODEL]: Initialize CUDA GRAPH")
+        #self.target_model.initialize_cuda_graph([self.tree_size])
+        #print("[TARGET MODEL]: Initialize CUDA GRAPH")
         
         
         self.sampling_callables = {}
@@ -129,7 +129,7 @@ class SpeculationEngine:
              attention_mask=self.attn_mask_this_iter[:prefix_len]
         )[0]
     
-        self.draft_logits[:prefix_len].copy_(draft_logits)
+        #self.draft_logits[:prefix_len].copy_(draft_logits)
         
         
         
@@ -140,13 +140,14 @@ class SpeculationEngine:
              attention_mask=self.attn_mask_this_iter[:prefix_len]
         )[0]
 
-        self.target_logits[:prefix_len].copy_(target_logits)
+        #self.target_logits[:prefix_len].copy_(target_logits)
         
         next_token = target_logits[-1:].argmax(dim=-1, keepdim=True)
         
         self.tokens[:,self.num_nodes:self.num_nodes+1] = next_token
         
     def speculative_decoding(self):
+        torch.cuda.synchronize()
         t1 = time.time()
         large_model_step = 0
         decode = True
@@ -154,6 +155,7 @@ class SpeculationEngine:
             self.build_tree()
             decode = self.verify()
             large_model_step = large_model_step + 1
+        torch.cuda.synchronize()
         t2 = time.time()
         tokens = self.tokens[0,:self.num_nodes + 1].tolist()
         text = self.tokenizer.decode(tokens, skip_special_tokens=True)
@@ -182,7 +184,6 @@ class SpeculationEngine:
             attention_mask=attention_mask
             )[0]
     
-            self.draft_logits[self.num_draft_tokens_this_iter:self.num_draft_tokens_this_iter+dec_len].copy_(draft_logits)
             self.num_draft_tokens_this_iter += dec_len
             if step < self.draft_step - 1:
                 
@@ -263,8 +264,8 @@ class SpeculationEngine:
         self.num_nodes = 0
         self.tokens.zero_()
         self.position_ids.zero_()
-        self.draft_logits.zero_()
-        self.target_logits.zero_()
+        #self.draft_logits.zero_()
+        #self.target_logits.zero_()
         self.accept_position.zero_()
         self.draft_model.llm.kv_cache.clear()
         self.target_model.llm.kv_cache.clear()
