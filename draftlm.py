@@ -5,6 +5,7 @@ import math
 import torch.nn.functional as F
 from torch import nn
 from typing import List, Optional
+import flashinfer
 import gc
 def _make_causal_mask(
     input_ids_shape: torch.Size, dtype: torch.dtype, device: torch.device
@@ -218,11 +219,11 @@ def layer_norm(
     layernorm_variance_epsilon: float,
     layernorm_weight: torch.Tensor,
 ):
-    input_dtype = hidden_states.dtype
-    hidden_states = hidden_states.to(torch.float32)
-    variance = hidden_states.pow(2).mean(-1, keepdim=True)
-    hidden_states = hidden_states * torch.rsqrt(variance + layernorm_variance_epsilon)
-    hidden_states = layernorm_weight * hidden_states.to(input_dtype)
+    b, s, h = hidden_states.shape
+    
+    hidden_states = hidden_states.reshape(b * s, h)
+    hidden_states = flashinfer.rmsnorm(hidden_states, layernorm_weight, layernorm_variance_epsilon)
+    hidden_states = hidden_states.reshape(b, s, h)
     return hidden_states
 
 class LLMLayer:
@@ -462,11 +463,11 @@ class LLM:
         for idx in range(self.num_layers):
                 hidden_states = self.layer_compute(self.layers[idx], idx, hidden_states, position_ids, attention_mask, storage_ids)
         
-        input_dtype = hidden_states.dtype
-        hidden_states = hidden_states.to(torch.float32)
-        variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        hidden_states = hidden_states * torch.rsqrt(variance + self.norm_variance_epsilon)
-        hidden_states = self.norm_weight * hidden_states.to(input_dtype)
+        b, s, h = hidden_states.shape
+
+        hidden_states = hidden_states.reshape(b * s, h)
+        hidden_states = flashinfer.rmsnorm(hidden_states, self.norm_weight, self.norm_variance_epsilon)
+        hidden_states = hidden_states.reshape(b, s, h)
         logits = F.linear(hidden_states, self.lm_head).float()
         return logits
 

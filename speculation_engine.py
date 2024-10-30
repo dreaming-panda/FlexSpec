@@ -76,15 +76,15 @@ class SpeculationEngine:
                     max_length=self.max_length, device=self.device,
                     dtype=self.dtype)
         
-        self.target_model = LLMEngine(
+        self.target_model = DraftLMEngine(
                     self.target_model_name, batch_size=1, 
                     max_length=self.max_length, device=self.device,
                     dtype=self.dtype)
         
         self.draft_model.initialize_cuda_graph(graph_capture_list)
         print("[DRAFT MODEL]: Initialize CUDA GRAPH")
-        #self.target_model.initialize_cuda_graph([self.tree_size])
-        #print("[TARGET MODEL]: Initialize CUDA GRAPH")
+        self.target_model.initialize_cuda_graph([self.tree_size])
+        print("[TARGET MODEL]: Initialize CUDA GRAPH")
         
         
         self.sampling_callables = {}
