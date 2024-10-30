@@ -1,28 +1,28 @@
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=1)
-Max Length :512, Decode Length :1, Prefix Length :128, inference time:0.0210892676115036s
+Max Length :512, Decode Length :1, Prefix Length :128, inference time:0.020033304214477538s
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=2)
-Max Length :512, Decode Length :2, Prefix Length :128, inference time:0.022149072408676147s
+Max Length :512, Decode Length :2, Prefix Length :128, inference time:0.020276924133300782s
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=4)
-Max Length :512, Decode Length :4, Prefix Length :128, inference time:0.0215903525352478s
+Max Length :512, Decode Length :4, Prefix Length :128, inference time:0.020327399253845215s
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=16)
-Max Length :512, Decode Length :16, Prefix Length :128, inference time:0.02188876760005951s
+Max Length :512, Decode Length :16, Prefix Length :128, inference time:0.020591676831245423s
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=17)
-Max Length :512, Decode Length :17, Prefix Length :128, inference time:0.023181838870048523s
+Max Length :512, Decode Length :17, Prefix Length :128, inference time:0.02189456331729889s
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=32)
-Max Length :512, Decode Length :32, Prefix Length :128, inference time:0.02265078055858612s
+Max Length :512, Decode Length :32, Prefix Length :128, inference time:0.021299033999443055s
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=33)
-Max Length :512, Decode Length :33, Prefix Length :128, inference time:0.02377273118495941s
+Max Length :512, Decode Length :33, Prefix Length :128, inference time:0.022517162442207337s
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=64)
-Max Length :512, Decode Length :64, Prefix Length :128, inference time:0.02450614070892334s
+Max Length :512, Decode Length :64, Prefix Length :128, inference time:0.0231116281747818s
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=65)
-Max Length :512, Decode Length :65, Prefix Length :128, inference time:0.026876413464546202s
+Max Length :512, Decode Length :65, Prefix Length :128, inference time:0.025467479825019835s
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=96)
-Max Length :512, Decode Length :96, Prefix Length :128, inference time:0.02759375178813934s
+Max Length :512, Decode Length :96, Prefix Length :128, inference time:0.02617082989215851s
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=128)
-Max Length :512, Decode Length :128, Prefix Length :128, inference time:0.027609917521476745s
+Max Length :512, Decode Length :128, Prefix Length :128, inference time:0.02603806972503662s
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=144)
-Max Length :512, Decode Length :144, Prefix Length :128, inference time:0.030598833799362183s
+Max Length :512, Decode Length :144, Prefix Length :128, inference time:0.030756980538368225s
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=192)
-Max Length :512, Decode Length :192, Prefix Length :128, inference time:0.03292625319957733s
+Max Length :512, Decode Length :192, Prefix Length :128, inference time:0.032352411031723025s
 Namespace(model='meta-llama/Llama-2-7b-chat-hf', T=2000, B=1, P=128, M=512, D=256)
-Max Length :512, Decode Length :256, Prefix Length :128, inference time:0.03585025882720947s
+Max Length :512, Decode Length :256, Prefix Length :128, inference time:0.035675625085830685s

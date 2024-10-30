@@ -12,10 +12,9 @@ def _make_causal_mask(
     Make causal mask used for bi-directional self-attention.
     """
     bsz, tgt_len = input_ids_shape
-    mask = torch.full((tgt_len, tgt_len), torch.tensor(torch.finfo(dtype).min, device=device), device=device)
+    mask = torch.full((tgt_len, tgt_len), torch.tensor(False, device=device), device=device)
     mask_cond = torch.arange(mask.size(-1), device=device)
-    mask.masked_fill_(mask_cond < (mask_cond + 1).view(mask.size(-1), 1), 0)
-    mask = mask.to(dtype)
+    mask.masked_fill_(mask_cond < (mask_cond + 1).view(mask.size(-1), 1), True)
     return mask
 
 def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
@@ -171,13 +170,13 @@ class KV_Cache:
 
         self.kv_offset = len(indices)
     
-    def gather_kv_incremental(self, indices: list[int], offset:int):
+    def gather_kv_incremental(self, indices: torch.LongTensor, offset:int):
 
-        self.k_cache[..., offset:offset + len(indices), :,:] = self.k_cache[..., indices, :,:]
-        self.v_cache[..., offset:offset + len(indices), :,:] = self.v_cache[..., indices, :,:]
+        self.k_cache[:,offset:offset + len(indices), :,:] = self.k_cache[:,indices, :,:]
+        self.v_cache[:,offset:offset + len(indices), :,:] = self.v_cache[:,indices, :,:]
 
-        self.k_cache[..., offset + len(indices):, :,:] = 0.0
-        self.v_cache[..., offset + len(indices):, :,:] = 0.0
+        self.k_cache[:,offset + len(indices):, :,:] = 0.0
+        self.v_cache[:,offset + len(indices):, :,:] = 0.0
 
         self.kv_offset = offset + len(indices)
 
@@ -192,9 +191,6 @@ class KV_Cache:
         
         self.k_cache[layer_idx].index_copy_(dim=0, index=storage_ids, source=new_k_cache)
         self.v_cache[layer_idx].index_copy_(dim=0, index=storage_ids, source=new_v_cache)
-        # if layer_idx == 0:
-        #     self.kv_offset += storage_ids.shape[0]
-        # return self.k_cache[layer_idx][:self.kv_offset,:,:], self.v_cache[layer_idx][:self.kv_offset,:,:]
         return self.k_cache[layer_idx], self.v_cache[layer_idx]
 
     def clear(self):
@@ -257,10 +253,10 @@ class LLMLayer:
         self.up_proj = hf_layer.mlp.up_proj.weight.detach()
         self.down_proj = hf_layer.mlp.down_proj.weight.detach()
 
-        self.input_layernorm_weight = hf_layer.input_layernorm.weight
+        self.input_layernorm_weight = hf_layer.input_layernorm.weight.detach()
         self.input_layernorm_variance_epsilon = hf_layer.input_layernorm.variance_epsilon
 
-        self.post_attention_layernorm_weight = hf_layer.post_attention_layernorm.weight
+        self.post_attention_layernorm_weight = hf_layer.post_attention_layernorm.weight.detach()
         self.post_attention_layernorm_variance_epsilon = hf_layer.post_attention_layernorm.variance_epsilon
 
         self.cos_cache :torch.Tensor= hf_layer.self_attn.rotary_emb.cos_cached

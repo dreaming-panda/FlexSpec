@@ -38,6 +38,9 @@ llm = LLMEngine(max_length=MAX_LEN, model_name=args.model)
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 text = """[INST] Hello, tell me what you know about China? [/INST] \n"""
 input_ids = tokenizer.encode(text=text, return_tensors="pt").to(device=DEVICE)
+# input_ids = torch.tensor([[    1,   518, 25580, 29962, 15043, 29892,  2649,   592,   825,   366,
+#           1073,  1048,  7551, 29973,   518, 29914, 25580, 29962, 29871,    13, 10994]],
+#        device='cuda:0').long()
 PREFIX_LEN = input_ids.shape[1]
 attention_mask = _make_causal_mask((MAX_LEN, MAX_LEN), dtype=DTYPE, device=DEVICE)
 #attention_mask = attention_mask[None, None, :, :]
@@ -49,6 +52,9 @@ logits = llm.inference(input_ids=input_ids, position_ids=position_ids[:,:PREFIX_
 print(logits)
 token = input_ids[0].tolist()
 for i in range(GEN_LEN):
+    #print(logits[:,-1,:])
     input_ids = torch.argmax(logits[:,-1,:], keepdim=True)
+    #print(input_ids)
+    print((logits[:,-1,:].topk(3)))
     logits = llm.inference(input_ids=input_ids, position_ids=position_ids[:,PREFIX_LEN+i:PREFIX_LEN+i+1], attention_mask=attention_mask[PREFIX_LEN+i:PREFIX_LEN+i+1,:], storage_ids=prefix_storage_ids[PREFIX_LEN+i:PREFIX_LEN+i+1])
-    print(logits)
+    #print(logits)

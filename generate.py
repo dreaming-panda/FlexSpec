@@ -18,7 +18,6 @@ def _make_causal_mask(
     return mask
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, default="meta-llama/Llama-2-7b-chat-hf",help='model')
-parser.add_argument('--T', type=int, default=2000, help='repeat times')
 parser.add_argument('--B', type=int, default=1, help='batch size')
 parser.add_argument('--M', type=int, default=512, help='max length')
 parser.add_argument('--D', type=int, default=1, help='dec length')
@@ -31,12 +30,11 @@ GEN_LEN = args.G
 MODEL_NAME = args.model
 DTYPE = torch.float16
 DEVICE = "cuda:0"
-T = args.T
 WARM_UP = 10
 
 llm = LLMEngine(max_length=MAX_LEN, model_name=args.model)
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-text = "[INST] Hello, tell me what you know about China? [/INST]"
+text = """[INST] Hello, tell me what you know about China? [/INST] \n"""
 input_ids = tokenizer.encode(text=text, return_tensors="pt").to(device=DEVICE)
 PREFIX_LEN = input_ids.shape[1]
 attention_mask = _make_causal_mask((MAX_LEN, MAX_LEN), dtype=DTYPE, device=DEVICE)
@@ -48,8 +46,9 @@ llm.initialize_cuda_graph([DEC_LEN, PREFIX_LEN])
 logits = llm.inference(input_ids=input_ids, position_ids=position_ids[:,:PREFIX_LEN], attention_mask=attention_mask[:PREFIX_LEN,:], storage_ids=prefix_storage_ids[:PREFIX_LEN])
 token = input_ids[0].tolist()
 for i in range(GEN_LEN):
-    proba = torch.softmax(logits[:,-1,:]/0.6, dim=-1)
-    input_ids = torch.multinomial(proba, num_samples=1)
+    # proba = torch.softmax(logits[:,-1,:]/0.6, dim=-1)
+    # input_ids = torch.multinomial(proba, num_samples=1)
+    input_ids = torch.argmax(logits[:,-1,:], keepdim=True)
     logits = llm.inference(input_ids=input_ids, position_ids=position_ids[:,PREFIX_LEN+i:PREFIX_LEN+i+1], attention_mask=attention_mask[PREFIX_LEN+i:PREFIX_LEN+i+1,:], storage_ids=prefix_storage_ids[PREFIX_LEN+i:PREFIX_LEN+i+1])
     token.append(input_ids.item())
 text = tokenizer.decode(token, skip_special_tokens=True)
