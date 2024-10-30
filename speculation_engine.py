@@ -44,15 +44,22 @@ class SpeculationEngine:
         
         idx_lists = self.growmap["roots"]
         self.draft_step = len(idx_lists)
-        self.accept_position = torch.zeros(self.draft_step, dtype=torch.int32, device=self.device)
+        
         self.growmap_roots = []
         for x in idx_lists:
              self.growmap_roots.append(torch.Tensor(x).to(self.device).long())
         self.Successors = self.growmap["Successors"]
         tree_mask :torch.Tensor = self.growmap["mask"].to(self.device)
         tree_mask = (tree_mask == 1)
+        self.tree_mask = tree_mask
+        self.node_in_path = self.tree_mask.int().sum(dim=-1)
+        
         self.tree_size = self.growmap["size"]
         print("[Sequoia], Tree Size {} | Tree Depth {}".format(self.tree_size, self.draft_step))
+        
+        self.parents = torch.zeros(self.tree_size,dtype=torch.int32, device=self.device)
+        for v, successor in enumerate(self.Successors):
+            self.parents[successor] = v
         
         
         self.attn_mask[self.max_length - self.tree_size: self.max_length, self.max_length - self.tree_size: self.max_length] = tree_mask
@@ -64,8 +71,6 @@ class SpeculationEngine:
         graph_capture_list = [sum(x) for x in self.branch_lists if sum(x) > 0]
         graph_capture_list.append(1)
         
-        # self.draft_logits = torch.zeros((self.max_length, self.vocab_size), dtype=torch.float32).to(self.device)
-        # self.target_logits = torch.zeros((self.max_length, self.vocab_size), dtype=torch.float32).to(self.device)
         self.draft_model = DraftLMEngine(
                     self.draft_model_name, batch_size=1, 
                     max_length=self.max_length, device=self.device,
@@ -213,25 +218,18 @@ class SpeculationEngine:
             sampled_tokens = torch.multinomial(proba, num_samples=1).squeeze(-1)
             
         speculated_tokens = self.tokens[0, self.num_nodes:self.num_draft_tokens_this_iter]
-        self.accept_position.zero_()
-        terminal = False
-        while not terminal:
-                parent_id = self.accept_position[num_accept_tokens]
-                target_token = sampled_tokens[parent_id]
-                children = self.Successors[parent_id]
-                if len(children) == 0:
-                    terminal = True
-                else:
-                    terminal = True
-                    for pos in children:
-                        token = speculated_tokens[pos]
-                        if token == target_token:
-                            num_accept_tokens += 1
-                            self.accept_position[num_accept_tokens] = pos
-                            terminal = False
-                            break
-        accept_length = num_accept_tokens + 1
-        accept_tokens = speculated_tokens[self.accept_position[:accept_length]]
+        ref_tokens = sampled_tokens[self.parents]
+        accept = (ref_tokens == speculated_tokens)
+        accept[0] = True
+        accept = accept[None,:].repeat(self.tree_size, 1)
+        
+        accept_node_in_path = (accept * self.tree_mask).int().sum(dim=-1)
+        accept_path = (accept_node_in_path == self.node_in_path).nonzero().squeeze_(-1)
+        
+        
+        target_token = sampled_tokens[accept_path[-1]]
+        accept_length = accept_path.shape[0]
+        accept_tokens = speculated_tokens[accept_path]
         self.tokens[0, self.num_nodes:self.num_nodes + accept_length] = accept_tokens
         self.tokens[0, self.num_nodes + accept_length] = target_token
         
@@ -240,9 +238,9 @@ class SpeculationEngine:
         ):
             return False
           
-        self.accept_position += self.num_nodes
-        self.draft_model.llm.kv_cache.gather_kv_incremental(self.accept_position[:accept_length], self.num_nodes)
-        self.target_model.llm.kv_cache.gather_kv_incremental(self.accept_position[:accept_length], self.num_nodes)
+        accept_path += self.num_nodes
+        self.draft_model.llm.kv_cache.gather_kv_incremental(accept_path, self.num_nodes)
+        self.target_model.llm.kv_cache.gather_kv_incremental(accept_path, self.num_nodes)
         
         num_last_iter_nodes = self.num_nodes
         self.num_nodes = self.num_nodes + accept_length
@@ -251,7 +249,7 @@ class SpeculationEngine:
         self.num_nodes_this_iter = self.num_nodes + self.tree_size
         self.attn_mask_this_iter = self.attn_mask[self.max_length - self.num_nodes_this_iter: 2 * self.max_length - self.num_nodes_this_iter, self.max_length - self.num_nodes_this_iter: 2 * self.max_length - self.num_nodes_this_iter].contiguous()
         
-        self.position_ids[:,num_last_iter_nodes:self.num_nodes] = self.position_ids[:,self.accept_position[:accept_length]]
+        self.position_ids[:,num_last_iter_nodes:self.num_nodes] = self.position_ids[:,accept_path]
         self.position_ids[:,self.num_nodes:self.num_nodes+self.tree_size] = self.num_nodes + self.depth
         
         return True
@@ -260,9 +258,6 @@ class SpeculationEngine:
         self.num_nodes = 0
         self.tokens.zero_()
         self.position_ids.zero_()
-        #self.draft_logits.zero_()
-        #self.target_logits.zero_()
-        self.accept_position.zero_()
         self.draft_model.llm.kv_cache.clear()
         self.target_model.llm.kv_cache.clear()
         
