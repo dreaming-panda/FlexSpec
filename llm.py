@@ -446,8 +446,7 @@ class LLM:
             attention_mask: torch.FloatTensor,
             storage_ids: torch.LongTensor):
         
-        hidden_states = F.embedding(input_ids, self.embed_tokens)
-       
+        hidden_states = F.embedding(input_ids, self.embed_tokens)  
         for idx in range(self.num_layers):
                 hidden_states = self.layer_compute(self.layers[idx], idx, hidden_states, position_ids, attention_mask, storage_ids)
         
@@ -543,4 +542,15 @@ class LLMEngine:
                 logits = self.callables[dec_length](input_ids, storage_ids, position_ids, attention_mask)
             else:
                 logits = self.llm.inference(input_ids, position_ids, attention_mask, storage_ids)
+            return logits
+
+    @torch.inference_mode()
+    def prefill(self,
+            input_ids: torch.LongTensor, 
+            storage_ids :torch.LongTensor,
+            position_ids: Optional[torch.LongTensor] = None,
+            attention_mask: Optional[torch.Tensor] = None,
+            ):
+           
+            logits = self.llm.inference(input_ids, position_ids, attention_mask, storage_ids)
             return logits
