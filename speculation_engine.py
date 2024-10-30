@@ -206,7 +206,7 @@ class SpeculationEngine:
         )[0]
         
         
-        num_accept_tokens = 0
+        
         if self.temperature < 0.05:
             # greedy decoding
             sampled_tokens = target_logits.argmax(dim=-1)
