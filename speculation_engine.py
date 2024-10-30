@@ -4,6 +4,7 @@ from transformers import AutoTokenizer
 from utils import cuda_graph_for_sampling_argmax
 import time
 import flashinfer
+from draftlm import DraftLMEngine
 class SpeculationEngine:
 
     def __init__(self,
@@ -63,9 +64,9 @@ class SpeculationEngine:
         graph_capture_list = [sum(x) for x in self.branch_lists if sum(x) > 0]
         graph_capture_list.append(1)
         
-        self.draft_logits = torch.zeros((self.max_length, self.vocab_size), dtype=torch.float32).to(self.device)
-        self.target_logits = torch.zeros((self.max_length, self.vocab_size), dtype=torch.float32).to(self.device)
-        self.draft_model = LLMEngine(
+        # self.draft_logits = torch.zeros((self.max_length, self.vocab_size), dtype=torch.float32).to(self.device)
+        # self.target_logits = torch.zeros((self.max_length, self.vocab_size), dtype=torch.float32).to(self.device)
+        self.draft_model = DraftLMEngine(
                     self.draft_model_name, batch_size=1, 
                     max_length=self.max_length, device=self.device,
                     dtype=self.dtype)
@@ -75,8 +76,8 @@ class SpeculationEngine:
                     max_length=self.max_length, device=self.device,
                     dtype=self.dtype)
         
-        #self.draft_model.initialize_cuda_graph(graph_capture_list)
-        #print("[DRAFT MODEL]: Initialize CUDA GRAPH")
+        self.draft_model.initialize_cuda_graph(graph_capture_list)
+        print("[DRAFT MODEL]: Initialize CUDA GRAPH")
         #self.target_model.initialize_cuda_graph([self.tree_size])
         #print("[TARGET MODEL]: Initialize CUDA GRAPH")
         
@@ -121,18 +122,14 @@ class SpeculationEngine:
         
         self.position_ids[:,:prefix_len] = torch.arange(prefix_len).unsqueeze(0)
         self.position_ids[:,prefix_len:prefix_len+self.tree_size] = prefix_len + self.depth
-        
-        draft_logits = self.draft_model.prefill(
+
+        self.draft_model.prefill(
              input_ids=self.tokens[:,:prefix_len],
              storage_ids=self.storage_ids[:prefix_len],
              position_ids=self.position_ids[:,:prefix_len],
              attention_mask=self.attn_mask_this_iter[:prefix_len]
-        )[0]
+        )
     
-        #self.draft_logits[:prefix_len].copy_(draft_logits)
-        
-        
-        
         target_logits = self.target_model.prefill(
              input_ids=self.tokens[:,:prefix_len],
              storage_ids=self.storage_ids[:prefix_len],
@@ -140,7 +137,6 @@ class SpeculationEngine:
              attention_mask=self.attn_mask_this_iter[:prefix_len]
         )[0]
 
-        #self.target_logits[:prefix_len].copy_(target_logits)
         
         next_token = target_logits[-1:].argmax(dim=-1, keepdim=True)
         
