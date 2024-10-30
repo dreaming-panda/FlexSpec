@@ -90,7 +90,7 @@ prefix_storage_ids = torch.arange(MAX_LEN, device=DEVICE)
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 total_time = 0
 total_decode_tokens = 0
-for idx, prompt in enumerate(prompts):
+for idx, prompt in enumerate(prompts[:10]):
     input_ids = tokenizer.encode(text=prompt, return_tensors="pt").to(DEVICE)
     prefix_len = input_ids.shape[1]
     if prefix_len > 128:
