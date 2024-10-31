@@ -1,6 +1,5 @@
 from speculation_engine import SpeculationEngine
 import os
-os.environ['TORCH_CUDA_ARCH_LIST'] =  "8.0"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import argparse
 parser = argparse.ArgumentParser()
@@ -23,16 +22,18 @@ engine = SpeculationEngine(
     target_model_name=target_model_name,
     growmap_path=path,
     device=DEVICE,
-    max_length=512,
-    gen_length=128
+    max_length=2048,
+    gen_length=512
 )
 
 
-text1 = """[INST] Hello, tell me what you know about China? [/INST] \n"""
+text1 = """User: [INST] Hello, tell me what you know about China? (in 200 words) [/INST] \nAssistant: """
 
-text2 = """[INST] Hello, tell me the relationship between China and Japan? [/INST] \n"""
+text2 = """\nUser: [INST] Then tell me the relationship between China and Japan (in 200 words)? [/INST] \nAssistant: """
 
 
 engine.initialize()
 engine.prefill(text1)
+engine.speculative_decoding()
+engine.append(text2)
 engine.speculative_decoding()

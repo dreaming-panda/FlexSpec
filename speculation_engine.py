@@ -83,8 +83,6 @@ class SpeculationEngine:
         
         self.draft_model.initialize_cuda_graph(graph_capture_list)
         print("[DRAFT MODEL]: Initialize CUDA GRAPH")
-        #self.target_model.initialize_cuda_graph([self.tree_size])
-        #print("[TARGET MODEL]: Initialize CUDA GRAPH")
         
         
         self.sampling_callables = {}
@@ -113,6 +111,11 @@ class SpeculationEngine:
         input_ids = self.tokenizer.encode(text=text, return_tensors="pt").to(device=self.device)
         
         self._prefill(input_ids=input_ids)
+    
+    def append(self, text:str):
+        input_ids = self.tokenizer.encode(text=text, return_tensors="pt").to(device=self.device)
+        input_ids = input_ids[:,1:]
+        self._append(input_ids)
     
     def _prefill(self, input_ids:torch.LongTensor):
         
@@ -146,21 +149,52 @@ class SpeculationEngine:
         next_token = target_logits[-1:].argmax(dim=-1, keepdim=True)
         
         self.tokens[:,self.num_nodes:self.num_nodes+1] = next_token
+    
+    def _append(self, input_ids:torch.LongTensor):
+        append_len = input_ids.shape[1]
+        self.tokens[:,self.num_nodes+1:self.num_nodes+1+append_len].copy_(input_ids)
+        num_last_iter_nodes = self.num_nodes
+        self.num_nodes += (append_len + 1)
+        self.num_nodes_this_iter = self.num_nodes + self.tree_size
+        self.attn_mask_this_iter = self.attn_mask[self.max_length - self.num_nodes_this_iter: 2 * self.max_length - self.num_nodes_this_iter, self.max_length - self.num_nodes_this_iter: 2 * self.max_length - self.num_nodes_this_iter].contiguous()
+        self.num_draft_tokens_this_iter = self.num_nodes
+        self.position_ids[:,:self.num_nodes] = torch.arange(self.num_nodes).unsqueeze(0)
+        self.position_ids[:,self.num_nodes:self.num_nodes+self.tree_size] = self.num_nodes + self.depth
+        
+        self.draft_model.prefill(
+             input_ids=self.tokens[:,num_last_iter_nodes:self.num_nodes],
+             storage_ids=self.storage_ids[num_last_iter_nodes:self.num_nodes],
+             position_ids=self.position_ids[:,num_last_iter_nodes:self.num_nodes],
+             attention_mask=self.attn_mask_this_iter[num_last_iter_nodes:self.num_nodes]
+        )
+    
+        target_logits = self.target_model.prefill(
+             input_ids=self.tokens[:,num_last_iter_nodes:self.num_nodes],
+             storage_ids=self.storage_ids[num_last_iter_nodes:self.num_nodes],
+             position_ids=self.position_ids[:,num_last_iter_nodes:self.num_nodes],
+             attention_mask=self.attn_mask_this_iter[num_last_iter_nodes:self.num_nodes]
+        )[0]
+        
+        next_token = target_logits[-1:].argmax(dim=-1, keepdim=True)
+        
+        self.tokens[:,self.num_nodes:self.num_nodes+1] = next_token
         
     def speculative_decoding(self):
         torch.cuda.synchronize()
         t1 = time.time()
         large_model_step = 0
         decode = True
-        while (self.num_nodes - self.prefix_len < self.gen_length) and decode:
+        start = self.num_nodes
+        while (self.num_nodes - start < self.gen_length) and decode:
             self.build_tree()
             decode = self.verify()
             large_model_step = large_model_step + 1
         torch.cuda.synchronize()
         t2 = time.time()
+        
         tokens = self.tokens[0,:self.num_nodes + 1].tolist()
         text = self.tokenizer.decode(tokens, skip_special_tokens=True)
-        dec_len = len(tokens) - self.prefix_len
+        dec_len = (self.num_nodes + 1 - start)
         print(text)
         print("[Speculative Decoding]: Avg Accept Tokens {:.2f}".format(dec_len/large_model_step))
         print("[Speculative Decoding]: TPOT {:.2f} ms".format(1000 * (t2-t1)/dec_len))
@@ -233,11 +267,12 @@ class SpeculationEngine:
         self.tokens[0, self.num_nodes:self.num_nodes + accept_length] = accept_tokens
         self.tokens[0, self.num_nodes + accept_length] = target_token
         
+        continue_generation = True
         if ((self.tokens[0, self.num_nodes:self.num_nodes + accept_length+1] == 0)._is_any_true() or
         (self.tokens[0, self.num_nodes:self.num_nodes + accept_length+1] == 2)._is_any_true()
         ):
-            return False
-          
+            continue_generation = False
+        
         accept_path += self.num_nodes
         self.draft_model.llm.kv_cache.gather_kv_incremental(accept_path, self.num_nodes)
         self.target_model.llm.kv_cache.gather_kv_incremental(accept_path, self.num_nodes)
@@ -252,7 +287,7 @@ class SpeculationEngine:
         self.position_ids[:,num_last_iter_nodes:self.num_nodes] = self.position_ids[:,accept_path]
         self.position_ids[:,self.num_nodes:self.num_nodes+self.tree_size] = self.num_nodes + self.depth
         
-        return True
+        return continue_generation
     def reset(self):
         self.prefix_len = 0
         self.num_nodes = 0
