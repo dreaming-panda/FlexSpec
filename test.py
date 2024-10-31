@@ -5,7 +5,7 @@ import urllib.request
 import os
 from speculation_engine import SpeculationEngine
 import torch
-os.environ['TORCH_CUDA_ARCH_LIST'] =  "8.9"
+os.environ['TORCH_CUDA_ARCH_LIST'] =  "8.0"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import argparse
 parser = argparse.ArgumentParser()
@@ -28,7 +28,7 @@ engine = SpeculationEngine(
     target_model_name=target_model_name,
     growmap_path=path,
     device=DEVICE,
-    max_length=512,
+    max_length=2048,
     gen_length=GEN_LEN
 )
 engine.initialize()

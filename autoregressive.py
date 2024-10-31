@@ -8,7 +8,7 @@ from llm import _make_causal_mask
 from transformers import AutoTokenizer
 import torch
 import time
-os.environ['TORCH_CUDA_ARCH_LIST'] =  "8.9"
+os.environ['TORCH_CUDA_ARCH_LIST'] =  "8.0"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import argparse
 parser = argparse.ArgumentParser()

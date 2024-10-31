@@ -1,10 +1,10 @@
 import torch
-from llm import _make_causal_mask
+from llm import _make_causal_mask, LLMEngine
 from transformers import AutoTokenizer
 from utils import cuda_graph_for_sampling_argmax
 import time
 import flashinfer
-from baselm import LLMEngine
+from baselm import LLMEngine as DraftEngine
 class SpeculationEngine:
 
     def __init__(self,
@@ -71,7 +71,7 @@ class SpeculationEngine:
         graph_capture_list = [sum(x) for x in self.branch_lists if sum(x) > 0]
         graph_capture_list.append(1)
         
-        self.draft_model = LLMEngine(
+        self.draft_model = DraftEngine(
                     self.draft_model_name, batch_size=1, 
                     max_length=self.max_length, device=self.device,
                     dtype=self.dtype)
@@ -83,8 +83,8 @@ class SpeculationEngine:
         
         self.draft_model.initialize_cuda_graph(graph_capture_list)
         print("[DRAFT MODEL]: Initialize CUDA GRAPH")
-        self.target_model.initialize_cuda_graph([self.tree_size])
-        print("[TARGET MODEL]: Initialize CUDA GRAPH")
+        #self.target_model.initialize_cuda_graph([self.tree_size])
+        #print("[TARGET MODEL]: Initialize CUDA GRAPH")
         
         
         self.sampling_callables = {}
