@@ -91,7 +91,8 @@ class SpeculationEngine:
         for i in range(self.draft_step - 1):
             idx_len = len(idx_lists[i])
             num_samples = max(self.branch_lists[i])
-            self.sampling_callables[i] = cuda_graph_for_sampling_argmax(device=self.device, idx_len=idx_len, num_samples=num_samples)
+            self.sampling_callables[i] = cuda_graph_for_sampling_argmax(device=self.device, 
+            idx_len=idx_len, num_samples=num_samples, dtype=torch.float32, dim=self.vocab_size)
         
         for i in range(self.draft_step - 1):
             ith_gather_list = []
